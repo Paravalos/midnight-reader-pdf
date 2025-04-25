@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { useToast } from '@/components/ui/use-toast';
@@ -7,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { ArrowLeft, ArrowRight, ZoomIn, ZoomOut, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 // Configure PDF.js worker
@@ -32,6 +34,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ className }) => {
     if (files && files[0]) {
       setFile(files[0]);
       setPageNumber(1);
+      // Initialize page refs array
       pageRefs.current = [];
       toast({
         title: "PDF Loaded",
@@ -43,6 +46,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ className }) => {
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setIsLoading(false);
+    // Initialize the refs array with the correct number of pages
     pageRefs.current = Array(numPages).fill(null);
   };
 
@@ -72,6 +76,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ className }) => {
   const zoomIn = () => changeScale(scale + 0.1);
   const zoomOut = () => changeScale(scale - 0.1);
 
+  // This method will render a specific page of the PDF
   const renderPage = (pageNum: number) => {
     if (!file) return null;
     
@@ -102,73 +107,86 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ className }) => {
     });
 
     try {
-      const fileData = await file.arrayBuffer();
+      // Create a hidden container to render all pages
+      const hiddenContainer = document.createElement('div');
+      hiddenContainer.style.position = 'absolute';
+      hiddenContainer.style.left = '-9999px';
+      hiddenContainer.style.top = '0';
+      document.body.appendChild(hiddenContainer);
+
+      // Create PDF document
+      const pdf = new jsPDF('portrait', 'pt', 'a4');
       
-      const loadingTask = pdfjs.getDocument({ data: fileData });
-      const pdf = await loadingTask.promise;
-      const numPages = pdf.numPages;
+      // Temporarily render all pages in the hidden container
+      const originalPage = pageNumber;
       
-      const outputPdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'pt',
-      });
+      // Create Document component in hidden container
+      const documentContainer = document.createElement('div');
+      documentContainer.className = 'pdf-container';
+      documentContainer.style.backgroundColor = '#242834';
+      documentContainer.style.padding = '20px';
+      hiddenContainer.appendChild(documentContainer);
       
-      for (let i = 1; i <= numPages; i++) {
-        const page = await pdf.getPage(i);
+      // Load PDF data as arrayBuffer for processing
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      const totalPages = pdfDoc.numPages;
+      
+      // Process each page
+      for (let i = 1; i <= totalPages; i++) {
+        // Create canvas for page
+        const pageCanvas = document.createElement('div');
+        pageCanvas.className = 'pdf-page';
+        documentContainer.appendChild(pageCanvas);
         
-        const viewport = page.getViewport({ scale: 2.0 });
+        // Get page from PDF.js
+        const page = await pdfDoc.getPage(i);
         
+        // Calculate dimensions
+        const viewport = page.getViewport({ scale: 1.5 });
+        
+        // Create canvas element
         const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d', { alpha: false });
-        canvas.width = viewport.width;
+        const context = canvas.getContext('2d');
         canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        pageCanvas.appendChild(canvas);
         
+        // Render PDF page to canvas
         await page.render({
           canvasContext: context!,
           viewport: viewport
         }).promise;
         
-        const imageData = context!.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
+        // Apply dark mode filter to canvas
+        applyDarkModeFilter(canvas);
         
-        for (let j = 0; j < data.length; j += 4) {
-          data[j] = 255 - data[j];
-          data[j + 1] = 255 - data[j + 1];
-          data[j + 2] = 255 - data[j + 2];
-          
-          if (data[j] > 220 && data[j + 1] > 220 && data[j + 2] > 220) {
-            data[j] = data[j] - 30;
-            data[j + 1] = data[j + 1] - 30;
-            data[j + 2] = data[j + 2] - 30;
-          } else if (data[j] < 35 && data[j + 1] < 35 && data[j + 2] < 35) {
-            data[j] = 36;
-            data[j + 1] = 40;
-            data[j + 2] = 52;
-          }
-        }
-        
-        context!.putImageData(imageData, 0, 0);
-        
-        const imgData = canvas.toDataURL('image/jpeg', 1.0);
-        
+        // Add page to PDF (first page is 0, subsequent pages need addPage)
         if (i > 1) {
-          outputPdf.addPage();
+          pdf.addPage();
         }
         
-        const imgProps = outputPdf.getImageProperties(imgData);
-        const imgWidth = outputPdf.internal.pageSize.getWidth();
-        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+        // Get the canvas data and add to PDF
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
         
-        if (imgHeight > outputPdf.internal.pageSize.getHeight()) {
-          const scaleFactor = outputPdf.internal.pageSize.getHeight() / imgHeight;
-          outputPdf.addImage(imgData, 'JPEG', 0, 0, imgWidth * scaleFactor, outputPdf.internal.pageSize.getHeight());
-        } else {
-          outputPdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
-        }
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        
+        // Remove the page from DOM to free memory
+        documentContainer.removeChild(pageCanvas);
       }
       
+      // Cleanup hidden container
+      document.body.removeChild(hiddenContainer);
+      
+      // Get the original filename without extension
       const originalFilename = file.name.replace(/\.[^/.]+$/, "");
-      outputPdf.save(`${originalFilename}-dark.pdf`);
+      pdf.save(`${originalFilename}-dark.pdf`);
+      
+      // Reset to original page
+      setPageNumber(originalPage);
       
       toast({
         title: "Download Complete",
@@ -184,6 +202,31 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ className }) => {
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  // Function to apply dark mode filter to canvas
+  const applyDarkModeFilter = (canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      // Invert colors
+      data[i] = 255 - data[i];       // Red
+      data[i + 1] = 255 - data[i + 1]; // Green
+      data[i + 2] = 255 - data[i + 2]; // Blue
+      
+      // Apply slight blue tint for better dark mode reading
+      if (data[i] < 50 && data[i + 1] < 50 && data[i + 2] < 50) {
+        data[i] = 36;      // Red component of #242834
+        data[i + 1] = 40;  // Green component of #242834
+        data[i + 2] = 52;  // Blue component of #242834
+      }
+    }
+    
+    ctx.putImageData(imageData, 0, 0);
   };
 
   return (
