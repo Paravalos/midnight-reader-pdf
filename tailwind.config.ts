@@ -65,7 +65,7 @@ export default {
 				},
 				reader: {
 					dark: '#1A1F2C',
-					paper: '#282c34'
+					paper: '#242834'  // Updated to slightly lighter very dark gray
 				}
 			},
 			borderRadius: {

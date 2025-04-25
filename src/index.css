@@ -58,7 +58,8 @@
 
   .pdf-page {
     filter: invert(1) hue-rotate(180deg);
-    background-color: #282c34;
+    background-color: #242834; /* Slightly lighter very dark gray */
+    user-select: text; /* Enable text selection */
   }
 
   .pdf-controls {
@@ -76,4 +77,26 @@
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Enable text selection in PDF viewer */
+.textLayer {
+  opacity: 0.4;
+  mix-blend-mode: difference;
+  user-select: text;
+  pointer-events: auto;
+}
+
+.textLayer ::selection {
+  background: rgba(0, 136, 255, 0.5);
+  color: inherit;
+}
+
+/* Improve text layer readability */
+.textLayer span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
 }

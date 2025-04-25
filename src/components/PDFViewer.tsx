@@ -112,8 +112,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ className }) => {
                 pageNumber={pageNumber}
                 scale={scale}
                 className="pdf-page animate-fade-in"
-                renderTextLayer={false}
-                renderAnnotationLayer={false}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
               />
             </Document>
           </div>
