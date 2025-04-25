@@ -1,11 +1,22 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React from 'react';
+import PDFViewer from '@/components/PDFViewer';
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="min-h-screen bg-reader-dark p-4 md:p-8">
+      <div className="max-w-5xl mx-auto">
+        <header className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Midnight Reader PDF</h1>
+          <p className="text-muted-foreground">Upload and view PDFs in dark mode, easy on the eyes.</p>
+        </header>
+        
+        <PDFViewer className="animate-fade-in" />
+        
+        <footer className="mt-8 text-center text-sm text-muted-foreground">
+          <p>Upload any PDF file to view it in dark mode.</p>
+          <p className="mt-2">The filter inverts colors and adjusts hue for better nighttime reading.</p>
+        </footer>
       </div>
     </div>
   );
